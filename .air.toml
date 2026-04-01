@@ -1,0 +1,20 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/cctl ."
+  bin = "./tmp/cctl"
+  args_bin = ["serve"]
+  delay = 500
+  exclude_dir = ["tmp", "web", "node_modules", "vendor", "docs"]
+  exclude_regex = ["_test\\.go$"]
+  include_ext = ["go"]
+  kill_delay = "1s"
+  send_interrupt = true
+  stop_on_error = true
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

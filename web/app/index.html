@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f9fafb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Crowd Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<script>
+// Apply theme before render to prevent flash
+(function() {
+  var t = localStorage.getItem('theme') || 'system';
+  var d = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (d) {
+    document.documentElement.classList.add('dark');
+    document.querySelector('meta[name="theme-color"]').content = '#030712';
+  }
+})();
+</script>
+</head>
+<body class="h-full bg-gray-50 dark:bg-gray-950" style="font-family: 'Inter', system-ui, -apple-system, sans-serif">
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

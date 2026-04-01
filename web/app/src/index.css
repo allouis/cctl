@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-gray-50: #f0f6fc;
+  --color-gray-100: #e6edf3;
+  --color-gray-200: #c9d1d9;
+  --color-gray-300: #b1bac4;
+  --color-gray-400: #8b949e;
+  --color-gray-500: #6e7681;
+  --color-gray-600: #484f58;
+  --color-gray-700: #30363d;
+  --color-gray-800: #1c2128;
+  --color-gray-900: #161b22;
+  --color-gray-950: #0d1117;
+}
+
+/* Markdown scoped styles */
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  font-weight: 600;
+  margin: 0.75em 0 0.25em;
+}
+.markdown h1 {
+  font-size: 1.25em;
+}
+.markdown h2 {
+  font-size: 1.125em;
+}
+.markdown h3 {
+  font-size: 1em;
+}
+.markdown p {
+  margin: 0.25em 0;
+}
+.markdown ul,
+.markdown ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+.markdown ul {
+  list-style: disc;
+}
+.markdown ol {
+  list-style: decimal;
+}
+.markdown li {
+  margin: 0.125em 0;
+}
+.markdown code {
+  background: rgba(110, 118, 129, 0.12);
+  padding: 0.125em 0.375em;
+  border-radius: 0.25em;
+  font-size: 0.875em;
+  font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo,
+    monospace;
+}
+.dark .markdown code {
+  background: rgba(110, 118, 129, 0.2);
+}
+.markdown pre {
+  background: rgba(110, 118, 129, 0.08);
+  padding: 0.75em;
+  border-radius: 0.375em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.dark .markdown pre {
+  background: rgba(110, 118, 129, 0.15);
+}
+.markdown pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.8125em;
+}
+.markdown a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+.dark .markdown a {
+  color: #58a6ff;
+}
+.markdown blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 0.75em;
+  color: #6b7280;
+  margin: 0.5em 0;
+}
+.dark .markdown blockquote {
+  border-left-color: #30363d;
+  color: #8b949e;
+}
+.markdown table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.875em;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid #d1d5db;
+  padding: 0.25em 0.5em;
+}
+.dark .markdown th,
+.dark .markdown td {
+  border-color: #30363d;
+}
+.markdown th {
+  background: rgba(110, 118, 129, 0.06);
+}
+.dark .markdown th {
+  background: rgba(110, 118, 129, 0.1);
+}
+
+/* Pulse animation for NEEDS_INPUT state */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Typing indicator dots */
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+.typing-dot {
+  animation: typing-dot 1.4s infinite ease-in-out;
+}
