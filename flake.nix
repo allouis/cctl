@@ -1,7 +1,7 @@
 {
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = { nixpkgs, ... }:
+  outputs = { self, nixpkgs, ... }:
     let
       forAllSystems = nixpkgs.lib.genAttrs [
         "aarch64-darwin"
@@ -44,10 +44,37 @@
 
             postInstall = ''
               wrapProgram $out/bin/cctl \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.tmux ]}
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.tmux pkgs.jujutsu pkgs.git ]}
             '';
           };
         });
+
+      homeModules.default = { config, lib, pkgs, ... }: {
+        options.services.cctl = {
+          enable = lib.mkEnableOption "cctl web dashboard";
+          port = lib.mkOption {
+            type = lib.types.port;
+            default = 4141;
+            description = "Port to serve the cctl dashboard on";
+          };
+        };
+        config = lib.mkIf config.services.cctl.enable {
+          systemd.user.services.cctl = {
+            Unit = {
+              Description = "cctl web dashboard";
+              After = [ "default.target" ];
+            };
+            Service = {
+              ExecStart = "${self.packages.${pkgs.system}.default}/bin/cctl serve --port ${toString config.services.cctl.port}";
+              Restart = "on-failure";
+              RestartSec = 5;
+            };
+            Install = {
+              WantedBy = [ "default.target" ];
+            };
+          };
+        };
+      };
 
       devShells = forAllSystems (system:
         let pkgs = nixpkgs.legacyPackages.${system};
