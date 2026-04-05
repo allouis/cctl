@@ -10,7 +10,9 @@ import (
 type Runner interface {
 	HasSession(name string) bool
 	NewSession(session, window, command string) error
-	NewWindow(session, window, command, dir string) (string, error)
+	SetEnv(session, key, value string) error
+	UnsetEnv(session, key string) error
+	NewWindow(session, window, command, dir string, env []string) (string, error)
 	ListWindows(session string) ([]Window, error)
 	ActiveWindowIDs(session string) map[string]bool
 	SelectWindow(session, target string) error
@@ -43,10 +45,21 @@ func (r *RealRunner) NewSession(session, window, command string) error {
 	return exec.Command("tmux", args...).Run()
 }
 
-func (r *RealRunner) NewWindow(session, window, command, dir string) (string, error) {
+func (r *RealRunner) SetEnv(session, key, value string) error {
+	return exec.Command("tmux", "set-environment", "-t", session, key, value).Run()
+}
+
+func (r *RealRunner) UnsetEnv(session, key string) error {
+	return exec.Command("tmux", "set-environment", "-t", session, "-u", key).Run()
+}
+
+func (r *RealRunner) NewWindow(session, window, command, dir string, env []string) (string, error) {
 	args := []string{"new-window", "-P", "-F", "#{window_id}", "-t", session, "-n", window}
 	if dir != "" {
 		args = append(args, "-c", dir)
+	}
+	for _, e := range env {
+		args = append(args, "-e", e)
 	}
 	if command != "" {
 		args = append(args, command)

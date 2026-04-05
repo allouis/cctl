@@ -21,7 +21,9 @@ type mockRunner struct {
 
 func (m *mockRunner) HasSession(name string) bool                     { return m.hasSession }
 func (m *mockRunner) NewSession(session, window, command string) error { return nil }
-func (m *mockRunner) NewWindow(session, window, command, dir string) (string, error) {
+func (m *mockRunner) SetEnv(session, key, value string) error         { return nil }
+func (m *mockRunner) UnsetEnv(session, key string) error              { return nil }
+func (m *mockRunner) NewWindow(session, window, command, dir string, env []string) (string, error) {
 	m.created = append(m.created, window)
 	return "@1", nil
 }

@@ -57,15 +57,31 @@
             default = 4141;
             description = "Port to serve the cctl dashboard on";
           };
+          claudePackage = lib.mkOption {
+            type = lib.types.package;
+            default = pkgs.claude-code;
+            defaultText = lib.literalExpression "pkgs.claude-code";
+            description = "Claude Code package to make available to cctl sessions.";
+          };
         };
-        config = lib.mkIf config.services.cctl.enable {
+        config = lib.mkIf config.services.cctl.enable (let
+          cfg = config.services.cctl;
+          cctlBin = self.packages.${pkgs.system}.default;
+          wrapper = pkgs.writeShellScript "cctl-serve" ''
+            # Match the tmux socket that login shells use (set by hm-session-vars).
+            export TMUX_TMPDIR="''${XDG_RUNTIME_DIR:-/tmp}"
+            export PATH="${cfg.claudePackage}/bin:$PATH"
+            exec ${cctlBin}/bin/cctl serve --port ${toString cfg.port}
+          '';
+          execStart = "${wrapper}";
+        in {
           systemd.user.services.cctl = {
             Unit = {
               Description = "cctl web dashboard";
               After = [ "default.target" ];
             };
             Service = {
-              ExecStart = "${self.packages.${pkgs.system}.default}/bin/cctl serve --port ${toString config.services.cctl.port}";
+              ExecStart = execStart;
               Restart = "on-failure";
               RestartSec = 5;
             };
@@ -73,7 +89,7 @@
               WantedBy = [ "default.target" ];
             };
           };
-        };
+        });
       };
 
       devShells = forAllSystems (system:

@@ -34,6 +34,33 @@ Or add it as an input to your own flake:
 }
 ```
 
+### Home-manager module
+
+cctl provides a home-manager module that runs the dashboard as a user service:
+
+```nix
+{
+  inputs.cctl.url = "github:allouis/cctl";
+
+  outputs = { cctl, ... }: {
+    homeConfigurations.me = home-manager.lib.homeManagerConfiguration {
+      modules = [
+        cctl.homeModules.default
+        {
+          services.cctl.enable = true;
+
+          # Optional: override the Claude Code package (defaults to pkgs.claude-code)
+          # services.cctl.claudePackage = my-claude-package;
+
+          # Optional: change the port (defaults to 4141)
+          # services.cctl.port = 8080;
+        }
+      ];
+    };
+  };
+}
+```
+
 The binary embeds the web frontend -- no separate install needed.
 
 ## Usage

@@ -79,9 +79,10 @@ func (s *Service) Get(nameOrID string) (*db.Session, error) {
 }
 
 // enrichSession applies runtime state corrections to a session.
+// live==nil means we couldn't query tmux — skip DEAD inference to avoid false positives.
 func (s *Service) enrichSession(sess *db.Session, live, attached map[string]bool) {
 	InferIdle(sess)
-	if sess.WindowID != "" && !live[sess.WindowID] && sess.ExecutorState != "DONE" {
+	if live != nil && sess.WindowID != "" && !live[sess.WindowID] && sess.ExecutorState != "DONE" {
 		sess.ExecutorState = "DEAD"
 		sess.ExecutorDetail = "window lost"
 		sess.WindowID = ""
@@ -145,6 +146,7 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 		if err := s.runner.NewSession(s.cfg.Session, "dash", ""); err != nil {
 			return "", fmt.Errorf("create tmux session: %w", err)
 		}
+		s.initSessionEnv()
 	}
 
 	// Generate session ID and build command
@@ -167,9 +169,9 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 		workspaceName = sessionID
 	}
 
-	command := s.buildCommand(sessionID, name, opts.Prompt, safe, false, workspaceName != "")
+	win := s.buildWindow(sessionID, name, opts.Prompt, safe, false, workspaceName != "")
 
-	windowID, err := s.runner.NewWindow(s.cfg.Session, name, command, workDir)
+	windowID, err := s.runner.NewWindow(s.cfg.Session, name, win.command, workDir, win.env)
 	if err != nil {
 		return "", fmt.Errorf("create window: %w", err)
 	}
@@ -198,9 +200,20 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 	return sessionID, nil
 }
 
-func (s *Service) buildCommand(sessionID, name, prompt string, safe, resume, isWorkspace bool) string {
+// windowSpec holds the command and per-window environment for a tmux window.
+type windowSpec struct {
+	command string
+	env     []string // KEY=VALUE pairs passed via tmux new-window -e
+}
+
+func (s *Service) buildWindow(sessionID, name, prompt string, safe, resume, isWorkspace bool) windowSpec {
+	env := []string{
+		"CCTL_NAME=" + name,
+		"AGENT_BROWSER_SESSION=" + sessionID,
+	}
+
 	if s.cfg.Cmd != "claude" {
-		return fmt.Sprintf("CCTL_NAME=%s %s", shellQuote(name), s.cfg.Cmd)
+		return windowSpec{command: s.cfg.Cmd, env: env}
 	}
 
 	hooksPath := filepath.Join(s.cfg.Dir, "hooks.json")
@@ -216,8 +229,7 @@ func (s *Service) buildCommand(sessionID, name, prompt string, safe, resume, isW
 	if prompt != "" {
 		flags += fmt.Sprintf(" -p %s", shellQuote(prompt))
 	}
-	cmd := fmt.Sprintf("env -u CLAUDECODE CCTL_NAME=%s AGENT_BROWSER_SESSION=%s claude %s",
-		shellQuote(name), sessionID, flags)
+	cmd := "claude " + flags
 
 	// Workspace directories are new every time, so Claude shows a trust
 	// prompt. Auto-approve by sending Enter from a background process.
@@ -228,7 +240,7 @@ func (s *Service) buildCommand(sessionID, name, prompt string, safe, resume, isW
 		cmd = fmt.Sprintf("bash -c 'sleep 3 && tmux send-keys -t \"$TMUX_PANE\" Enter &'; %s", cmd)
 	}
 
-	return cmd
+	return windowSpec{command: cmd, env: env}
 }
 
 // Kill terminates a session's tmux window and marks it DEAD.
@@ -268,6 +280,7 @@ func (s *Service) Resume(nameOrID string) error {
 		if err := s.runner.NewSession(s.cfg.Session, "dash", ""); err != nil {
 			return fmt.Errorf("create tmux session: %w", err)
 		}
+		s.initSessionEnv()
 	}
 
 	if err := s.ensureHooksJSON(); err != nil {
@@ -278,7 +291,7 @@ func (s *Service) Resume(nameOrID string) error {
 	// This can happen when a tmux window dies but the process survives.
 	killOrphanedProcess(sess.SessionID)
 
-	command := s.buildCommand(sess.SessionID, sess.Name, "", sess.Safe, true, sess.Workspace != "")
+	win := s.buildWindow(sess.SessionID, sess.Name, "", sess.Safe, true, sess.Workspace != "")
 
 	// Use workspace dir if the session has one, otherwise the original CWD.
 	dir := sess.CWD
@@ -289,7 +302,7 @@ func (s *Service) Resume(nameOrID string) error {
 		}
 	}
 
-	windowID, err := s.runner.NewWindow(s.cfg.Session, sess.Name, command, dir)
+	windowID, err := s.runner.NewWindow(s.cfg.Session, sess.Name, win.command, dir, win.env)
 	if err != nil {
 		return fmt.Errorf("create window: %w", err)
 	}
@@ -414,13 +427,26 @@ func (s *Service) Takeover(nameOrID string) error {
 }
 
 // liveWindowIDs returns the set of tmux window IDs (@N) that currently exist.
+// Returns nil if the tmux session doesn't exist (so callers skip DEAD marking).
 func (s *Service) liveWindowIDs() map[string]bool {
-	windows, _ := s.runner.ListWindows(s.cfg.Session)
+	windows, err := s.runner.ListWindows(s.cfg.Session)
+	if err != nil {
+		// Session doesn't exist or tmux unreachable — return nil so
+		// enrichSession doesn't incorrectly mark everything DEAD.
+		return nil
+	}
 	ids := make(map[string]bool)
 	for _, w := range windows {
 		ids[w.ID] = true
 	}
 	return ids
+}
+
+// initSessionEnv sets the tmux session environment so windows can
+// find tools and don't inherit unwanted vars from a parent Claude.
+func (s *Service) initSessionEnv() {
+	s.runner.SetEnv(s.cfg.Session, "PATH", os.Getenv("PATH"))
+	s.runner.UnsetEnv(s.cfg.Session, "CLAUDECODE")
 }
 
 func (s *Service) ensureHooksJSON() error {
