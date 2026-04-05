@@ -93,7 +93,7 @@ function Layout() {
   }, [modalOpen, view, showDashboard]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       {/* Sidebar — desktop only */}
       <aside className="hidden lg:flex w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex-col shrink-0">
         <Sidebar

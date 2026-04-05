@@ -24,8 +24,8 @@ export function Header({
   const cwd = session ? formatCwd(session.cwd, session.dir) : null;
 
   return (
-    <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 shrink-0">
-      {view.kind === "session" ? (
+    <header className="flex items-center gap-3 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 shrink-0">
+      {view.kind === "session" && (
         <button
           onClick={onBack}
           className="lg:hidden p-1 -ml-1 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -44,18 +44,14 @@ export function Header({
             />
           </svg>
         </button>
-      ) : (
-        <span className="lg:hidden text-sm font-semibold text-gray-900 dark:text-gray-100">
-          Crowd Control
-        </span>
       )}
 
-      <h2 className={`text-sm font-semibold text-gray-900 dark:text-gray-100 truncate ${view.kind === "dashboard" ? "lg:block" : ""}`}>
+      <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
         {view.kind === "dashboard" ? "Dashboard" : session?.name ?? ""}
       </h2>
 
       {view.kind === "dashboard" && sessions.length > 0 && (
-        <span className="text-xs text-gray-400 dark:text-gray-500 hidden lg:inline">
+        <span className="text-xs text-gray-400 dark:text-gray-500">
           {formatSessionCount(sessions.length)}
         </span>
       )}

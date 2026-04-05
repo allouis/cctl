@@ -26,7 +26,7 @@ export function DashboardView({
 
   if (sessions.length === 0) {
     return (
-      <div className="h-full overflow-y-auto p-4">
+      <div className="h-full overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="text-center text-gray-500 py-12 text-sm">
           No active sessions
         </div>
@@ -37,7 +37,7 @@ export function DashboardView({
   const visible = showEnded ? sorted : active;
 
   return (
-    <div className="h-full overflow-y-auto p-4">
+    <div className="h-full overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {visible.map((s) => (
           <SessionCard

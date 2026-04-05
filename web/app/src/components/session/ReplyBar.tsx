@@ -104,7 +104,7 @@ export function ReplyBar({ sessionId, sessionState, attached, onSent }: ReplyBar
 
   if (isDead) {
     return (
-      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-950">
+      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white dark:bg-gray-950">
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-400 dark:text-gray-500">
             Session ended
@@ -126,7 +126,7 @@ export function ReplyBar({ sessionId, sessionState, attached, onSent }: ReplyBar
 
   if (attached) {
     return (
-      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-950">
+      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white dark:bg-gray-950">
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-400 dark:text-gray-500">
             Attached via tmux
@@ -147,7 +147,7 @@ export function ReplyBar({ sessionId, sessionState, attached, onSent }: ReplyBar
   }
 
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2.5 bg-white dark:bg-gray-950">
+    <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] bg-white dark:bg-gray-950">
       {error && (
         <div className="text-xs text-red-500 mb-1.5">{error}</div>
       )}

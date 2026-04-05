@@ -12,7 +12,7 @@ export function ActionBar({ session }: { session: Session }) {
 
   if (session.attached) {
     return (
-      <div className="border-t border-gray-200 dark:border-gray-700 border-l-3 border-l-amber-400 bg-amber-500/8 px-4 py-2.5 flex items-center gap-3">
+      <div className="border-t border-gray-200 dark:border-gray-700 border-l-3 border-l-amber-400 bg-amber-500/8 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] flex items-center gap-3">
         <span className="flex-1 text-xs font-medium text-gray-600 dark:text-gray-300 truncate">
           {session.preview || "Permission required"} — Attached via tmux
         </span>
@@ -33,7 +33,7 @@ export function ActionBar({ session }: { session: Session }) {
   }
 
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 border-l-3 border-l-red-400 bg-red-500/8 px-4 py-2.5 flex items-center gap-3">
+    <div className="border-t border-gray-200 dark:border-gray-700 border-l-3 border-l-red-400 bg-red-500/8 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] flex items-center gap-3">
       <span className="flex-1 text-xs font-medium text-gray-600 dark:text-gray-300 truncate">
         {session.preview || "Permission required"}
       </span>

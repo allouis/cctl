@@ -105,7 +105,7 @@ export function Sidebar({
   const [newProjectName, setNewProjectName] = useState("");
   return (
     <>
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center gap-3 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] border-b border-gray-200 dark:border-gray-700">
         <div
           className={`w-2.5 h-2.5 rounded-full shrink-0 ${connected ? "bg-emerald-500" : "bg-red-500"}`}
           title={connected ? "Connected" : "Disconnected"}
