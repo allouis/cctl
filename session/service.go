@@ -231,12 +231,13 @@ func (s *Service) buildWindow(sessionID, name, prompt string, safe, resume, isWo
 	}
 	cmd := "claude " + flags
 
-	// Workspace directories are new every time, so Claude shows a trust
-	// prompt. Auto-approve by sending Enter from a background process.
-	// The sleep gives Claude time to render the prompt. Harmless if no
-	// prompt is shown (Enter at idle prompt is ignored).
+	// Claude shows a workspace trust prompt for untrusted directories.
+	// Auto-approve by sending Enter from a background process when
+	// running without --safe (permissions are already skipped, so the
+	// user trusts the directory). Harmless if no prompt appears — Enter
+	// at the idle prompt is ignored.
 	// Wrapped in bash -c because tmux may use fish as default shell.
-	if isWorkspace && !resume {
+	if !safe && !resume {
 		cmd = fmt.Sprintf("bash -c 'sleep 3 && tmux send-keys -t \"$TMUX_PANE\" Enter &'; %s", cmd)
 	}
 
