@@ -68,10 +68,11 @@
           cfg = config.services.cctl;
           cctlBin = self.packages.${pkgs.system}.default;
           wrapper = pkgs.writeShellScript "cctl-serve" ''
-            # Match the tmux socket that login shells use (set by hm-session-vars).
-            export TMUX_TMPDIR="''${XDG_RUNTIME_DIR:-/tmp}"
-            export PATH="${cfg.claudePackage}/bin:$PATH"
-            exec ${cctlBin}/bin/cctl serve --port ${toString cfg.port}
+            exec ${pkgs.runtimeShell} -l -c '
+              export TMUX_TMPDIR="''${XDG_RUNTIME_DIR:-/tmp}"
+              export PATH="${cfg.claudePackage}/bin:$PATH"
+              exec ${cctlBin}/bin/cctl serve --port ${toString cfg.port}
+            '
           '';
           execStart = "${wrapper}";
         in {
