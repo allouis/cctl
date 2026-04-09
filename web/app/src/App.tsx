@@ -8,6 +8,7 @@ import type { ViewState, Project } from "./types";
 import { DashboardView } from "./components/dashboard/DashboardView";
 import { SessionView } from "./components/session/SessionView";
 import { NewSessionModal } from "./components/shared/NewSessionModal";
+import { RepoSessionModal } from "./components/shared/RepoSessionModal";
 import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 import { deleteSession, getProjects, getRepos } from "./api/client";
 
@@ -32,6 +33,7 @@ function Layout() {
   const { attentionCount } = useNotifications(sessions);
   const [view, setView] = useState<ViewState>(parseUrl);
   const [modalOpen, setModalOpen] = useState(false);
+  const [repoModalOpen, setRepoModalOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [repos, setRepos] = useState<string[]>([]);
 
@@ -81,8 +83,9 @@ function Layout() {
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (modalOpen) {
+        if (modalOpen || repoModalOpen) {
           setModalOpen(false);
+          setRepoModalOpen(false);
         } else if (view.kind === "session") {
           showDashboard();
         }
@@ -90,7 +93,7 @@ function Layout() {
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [modalOpen, view, showDashboard]);
+  }, [modalOpen, repoModalOpen, view, showDashboard]);
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -106,7 +109,7 @@ function Layout() {
           onSetTheme={setTheme}
           onShowDashboard={showDashboard}
           onShowSession={showSession}
-          onNewSession={() => setModalOpen(true)}
+          onNewSession={() => repos.length > 0 ? setRepoModalOpen(true) : setModalOpen(true)}
           onProjectsChanged={refreshProjects}
         />
       </aside>
@@ -118,7 +121,7 @@ function Layout() {
           sessions={sessions}
           onBack={showDashboard}
           onKillSession={handleKillSession}
-          onNewSession={() => setModalOpen(true)}
+          onNewSession={() => repos.length > 0 ? setRepoModalOpen(true) : setModalOpen(true)}
         />
 
         <main className="flex-1 overflow-hidden">
@@ -140,6 +143,18 @@ function Layout() {
       <NewSessionModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
+        onCreated={(sessionId) => {
+          showSession(sessionId);
+          refreshProjects();
+        }}
+        projects={projects}
+        onProjectCreated={refreshProjects}
+        repos={repos}
+      />
+
+      <RepoSessionModal
+        open={repoModalOpen}
+        onClose={() => setRepoModalOpen(false)}
         onCreated={(sessionId) => {
           showSession(sessionId);
           refreshProjects();
