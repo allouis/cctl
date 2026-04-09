@@ -67,6 +67,13 @@ func (m *JJManager) Create(repoDir, sessionID string) (string, error) {
 		return "", fmt.Errorf("create workspace parent: %w", err)
 	}
 
+	// Ensure the repo's working copy is not stale before adding a workspace.
+	// This is a no-op when fresh, but fixes staleness caused by concurrent
+	// workspace operations or external jj commands.
+	update := exec.Command("jj", "workspace", "update-stale")
+	update.Dir = repoDir
+	update.CombinedOutput() // best-effort
+
 	cmd := exec.Command("jj", "workspace", "add", workDir, "--name", sessionID)
 	cmd.Dir = repoDir
 	if out, err := cmd.CombinedOutput(); err != nil {
