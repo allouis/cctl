@@ -14,6 +14,7 @@ import {
   formatDetail,
   formatCwd,
   formatRelativeTime,
+  formatRepoName,
   groupByProject,
 } from "./session";
 
@@ -336,5 +337,40 @@ describe("groupByProject", () => {
   it("handles empty sessions", () => {
     const groups = groupByProject([], []);
     expect(groups).toHaveLength(0);
+  });
+});
+
+describe("formatRepoName", () => {
+  it("returns basename of dir", () => {
+    expect(formatRepoName("/home/agent/cctl")).toBe("cctl");
+  });
+
+  it("uses dir over cwd when dir is not a workspace path", () => {
+    expect(
+      formatRepoName("/home/agent/ghost", "/home/agent/.config/cctl/workspaces/abc"),
+    ).toBe("ghost");
+  });
+
+  it("falls back to cwd basename when dir is a workspace path", () => {
+    expect(
+      formatRepoName(
+        "/home/agent/.config/cctl/workspaces/abc",
+        "/home/agent/ghost",
+      ),
+    ).toBe("ghost");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(formatRepoName("")).toBe("");
+  });
+});
+
+describe("abbreviateHome (via formatCwd)", () => {
+  it("replaces /home/user with ~", () => {
+    expect(formatCwd("/home/agent/code/project").display).toBe("~/code/project");
+  });
+
+  it("replaces /Users/user with ~", () => {
+    expect(formatCwd("/Users/egg/Code/project").display).toBe("~/Code/project");
   });
 });

@@ -149,8 +149,15 @@ export interface FormattedCwd {
 }
 
 function abbreviateHome(path: string): string {
-  const homeMatch = path.match(/^\/Users\/[^/]+/);
+  const homeMatch = path.match(/^\/(?:Users|home)\/[^/]+/);
   return homeMatch ? "~" + path.slice(homeMatch[0].length) : path;
+}
+
+export function formatRepoName(dir: string, cwd?: string): string {
+  const wsMarker = ".config/cctl/workspaces/";
+  const path = dir && !dir.includes(wsMarker) ? dir : cwd ?? dir;
+  if (!path) return "";
+  return path.split("/").pop() || path;
 }
 
 export function formatCwd(cwd: string, dir?: string): FormattedCwd {

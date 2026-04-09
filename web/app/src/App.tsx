@@ -128,6 +128,7 @@ function Layout() {
           {view.kind === "dashboard" ? (
             <DashboardView
               sessions={sessions}
+              projects={projects}
               onSelectSession={showSession}
             />
           ) : (
