@@ -34,3 +34,8 @@ func DefaultDir() string {
 	}
 	return filepath.Join(home, ".config", "cctl")
 }
+
+// SystemPromptPath returns the path to the global system prompt file.
+func (c *Config) SystemPromptPath() string {
+	return filepath.Join(c.Dir, "system-prompt.md")
+}

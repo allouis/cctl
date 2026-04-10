@@ -226,6 +226,11 @@ func (s *Service) buildWindow(sessionID, name, prompt string, safe, resume, isWo
 	if !safe {
 		flags += " --dangerously-skip-permissions"
 	}
+	if sp := s.cfg.SystemPromptPath(); sp != "" {
+		if info, err := os.Stat(sp); err == nil && info.Size() > 0 {
+			flags += fmt.Sprintf(" --append-system-prompt-file %s", shellQuote(sp))
+		}
+	}
 	if prompt != "" {
 		flags += fmt.Sprintf(" -p %s", shellQuote(prompt))
 	}

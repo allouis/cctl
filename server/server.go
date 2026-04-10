@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -41,6 +43,7 @@ func New(svc *session.Service, cfg *config.Config, notify <-chan struct{}) *Serv
 	s.mux.HandleFunc("/api/projects", s.handleProjects)
 	s.mux.HandleFunc("/api/projects/", s.handleProject)
 	s.mux.HandleFunc("/api/repos", s.handleRepos)
+	s.mux.HandleFunc("/api/system-prompt", s.handleSystemPrompt)
 	s.mux.HandleFunc("/api/events", s.handleEvents)
 
 	return s
@@ -247,6 +250,44 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleSystemPrompt(w http.ResponseWriter, r *http.Request) {
+	path := s.cfg.SystemPromptPath()
+
+	switch r.Method {
+	case http.MethodGet:
+		data, err := os.ReadFile(path)
+		if os.IsNotExist(err) {
+			data = []byte{}
+		} else if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]string{"content": string(data)})
+
+	case http.MethodPut:
+		body, err := io.ReadAll(io.LimitReader(r.Body, 64*1024))
+		if err != nil {
+			http.Error(w, "read body failed", http.StatusBadRequest)
+			return
+		}
+		var req struct {
+			Content string `json:"content"`
+		}
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+		if err := os.WriteFile(path, []byte(req.Content), 0o644); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]string{"status": "saved"})
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
