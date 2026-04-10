@@ -104,3 +104,17 @@ export function deleteProject(id: string): Promise<{ status: string }> {
     method: "DELETE",
   });
 }
+
+export function getSystemPrompt(): Promise<{ content: string }> {
+  return fetchJSON<{ content: string }>("/api/system-prompt");
+}
+
+export function saveSystemPrompt(
+  content: string,
+): Promise<{ status: string }> {
+  return fetchJSON("/api/system-prompt", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}

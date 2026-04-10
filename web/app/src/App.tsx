@@ -9,6 +9,7 @@ import { DashboardView } from "./components/dashboard/DashboardView";
 import { SessionView } from "./components/session/SessionView";
 import { NewSessionModal } from "./components/shared/NewSessionModal";
 import { RepoSessionModal } from "./components/shared/RepoSessionModal";
+import { SystemPromptModal } from "./components/shared/SystemPromptModal";
 import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 import { deleteSession, getProjects, getRepos } from "./api/client";
 
@@ -34,6 +35,7 @@ function Layout() {
   const [view, setView] = useState<ViewState>(parseUrl);
   const [modalOpen, setModalOpen] = useState(false);
   const [repoModalOpen, setRepoModalOpen] = useState(false);
+  const [systemPromptOpen, setSystemPromptOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [repos, setRepos] = useState<string[]>([]);
 
@@ -83,9 +85,10 @@ function Layout() {
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (modalOpen || repoModalOpen) {
+        if (modalOpen || repoModalOpen || systemPromptOpen) {
           setModalOpen(false);
           setRepoModalOpen(false);
+          setSystemPromptOpen(false);
         } else if (view.kind === "session") {
           showDashboard();
         }
@@ -93,7 +96,7 @@ function Layout() {
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [modalOpen, repoModalOpen, view, showDashboard]);
+  }, [modalOpen, repoModalOpen, systemPromptOpen, view, showDashboard]);
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -111,6 +114,7 @@ function Layout() {
           onShowSession={showSession}
           onNewSession={() => repos.length > 0 ? setRepoModalOpen(true) : setModalOpen(true)}
           onProjectsChanged={refreshProjects}
+          onOpenSystemPrompt={() => setSystemPromptOpen(true)}
         />
       </aside>
 
@@ -122,6 +126,7 @@ function Layout() {
           onBack={showDashboard}
           onKillSession={handleKillSession}
           onNewSession={() => repos.length > 0 ? setRepoModalOpen(true) : setModalOpen(true)}
+          onOpenSystemPrompt={() => setSystemPromptOpen(true)}
         />
 
         <main className="flex-1 overflow-hidden">
@@ -163,6 +168,11 @@ function Layout() {
         projects={projects}
         onProjectCreated={refreshProjects}
         repos={repos}
+      />
+
+      <SystemPromptModal
+        open={systemPromptOpen}
+        onClose={() => setSystemPromptOpen(false)}
       />
     </div>
   );
