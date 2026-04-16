@@ -54,7 +54,7 @@ func (r *RealRunner) UnsetEnv(session, key string) error {
 }
 
 func (r *RealRunner) NewWindow(session, window, command, dir string, env []string) (string, error) {
-	args := []string{"new-window", "-P", "-F", "#{window_id}", "-t", session, "-n", window}
+	args := []string{"new-window", "-a", "-P", "-F", "#{window_id}", "-t", session, "-n", window}
 	if dir != "" {
 		args = append(args, "-c", dir)
 	}
