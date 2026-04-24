@@ -369,6 +369,13 @@ func (d *DB) UpdateWindowID(sessionID, windowID string) error {
 	return err
 }
 
+func (d *DB) UpdateSessionWorkspace(sessionID, workspace string) error {
+	_, err := d.conn.Exec(
+		`UPDATE sessions SET workspace = ? WHERE session_id = ?`,
+		workspace, sessionID)
+	return err
+}
+
 func (d *DB) DeleteSession(name string) error {
 	_, err := d.conn.Exec(`DELETE FROM sessions WHERE name = ?`, name)
 	return err

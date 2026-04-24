@@ -161,12 +161,12 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 	var workspaceName string
 	workDir := dir
 	if mgr := workspace.Detect(dir, s.cfg.Dir); mgr != nil {
-		wd, err := mgr.Create(dir, sessionID)
+		workspaceName = workspace.Name(name, sessionID)
+		wd, err := mgr.Create(dir, workspaceName)
 		if err != nil {
 			return "", fmt.Errorf("create workspace: %w", err)
 		}
 		workDir = wd
-		workspaceName = sessionID
 	}
 
 	win := s.buildWindow(sessionID, name, opts.Prompt, safe, false, workspaceName != "")
@@ -250,6 +250,9 @@ func (s *Service) buildWindow(sessionID, name, prompt string, safe, resume, isWo
 }
 
 // Kill terminates a session's tmux window and marks it DEAD.
+// If the session's workspace is clean (no uncommitted changes, no unlanded commits),
+// the workspace is pruned too — there's nothing to lose, and it keeps `jj log` tidy.
+// A dirty workspace is retained so `cctl resume` can still pick up where it left off.
 func (s *Service) Kill(nameOrID string) error {
 	sess, err := s.resolveSession(nameOrID)
 	if err != nil {
@@ -263,9 +266,31 @@ func (s *Service) Kill(nameOrID string) error {
 		s.runner.KillWindow(s.cfg.Session, sess.WindowID)
 	}
 
+	s.pruneWorkspaceIfClean(sess)
+
 	s.store.UpdateSessionState(sess.SessionID, "DEAD", "killed")
 	s.store.UpdateWindowID(sess.SessionID, "")
 	return nil
+}
+
+// pruneWorkspaceIfClean removes the session's workspace (and clears the DB field)
+// when nothing would be lost. Best-effort — errors are swallowed because Kill must
+// always succeed at marking the session dead.
+func (s *Service) pruneWorkspaceIfClean(sess *db.Session) {
+	if sess.Workspace == "" {
+		return
+	}
+	mgr := workspace.Detect(sess.Dir, s.cfg.Dir)
+	if mgr == nil {
+		return
+	}
+	clean, err := mgr.IsClean(sess.Dir, sess.Workspace)
+	if err != nil || !clean {
+		return
+	}
+	mgr.Remove(sess.Dir, sess.Workspace)
+	s.store.UpdateSessionWorkspace(sess.SessionID, "")
+	sess.Workspace = ""
 }
 
 // Resume recreates a tmux window for a DEAD or DONE session.
@@ -300,12 +325,21 @@ func (s *Service) Resume(nameOrID string) error {
 	win := s.buildWindow(sess.SessionID, sess.Name, "", sess.Safe, true, sess.Workspace != "")
 
 	// Use workspace dir if the session has one, otherwise the original CWD.
+	// If the workspace dir is missing (pruned by Kill or an earlier `workspace prune`),
+	// recreate it so Resume always lands in a real isolated working copy.
 	dir := sess.CWD
 	if sess.Workspace != "" {
 		workDir := workspace.WorkspaceDir(s.cfg.Dir, sess.Workspace)
-		if info, err := os.Stat(workDir); err == nil && info.IsDir() {
-			dir = workDir
+		if info, err := os.Stat(workDir); err != nil || !info.IsDir() {
+			mgr := workspace.Detect(sess.Dir, s.cfg.Dir)
+			if mgr == nil {
+				return fmt.Errorf("cannot recreate workspace: no VCS at %s", sess.Dir)
+			}
+			if _, err := mgr.Create(sess.Dir, sess.Workspace); err != nil {
+				return fmt.Errorf("recreate workspace: %w", err)
+			}
 		}
+		dir = workDir
 	}
 
 	windowID, err := s.runner.NewWindow(s.cfg.Session, sess.Name, win.command, dir, win.env)
@@ -505,6 +539,83 @@ func (s *Service) DeleteProject(id string) error {
 
 func (s *Service) SetSessionProject(sessionID string, projectID *string) error {
 	return s.store.UpdateSessionProject(sessionID, projectID)
+}
+
+// PruneResult reports the outcome of PruneWorkspaces.
+type PruneResult struct {
+	Pruned   []string // workspaces removed because their DEAD/DONE session was clean
+	Retained []string // workspaces kept because they had unlanded work
+	Orphans  []string // workspaces removed because no session referenced them
+}
+
+// PruneWorkspaces removes workspaces that are safe to delete:
+//   - DEAD/DONE sessions whose workspace is clean (no uncommitted changes, no unlanded commits)
+//   - VCS-tracked workspaces that no cctl session references at all (orphans)
+//
+// Live sessions are never touched, and DEAD/DONE sessions with unlanded work are
+// retained so they remain resumable.
+func (s *Service) PruneWorkspaces() (PruneResult, error) {
+	var res PruneResult
+	sessions, err := s.store.ListSessions()
+	if err != nil {
+		return res, fmt.Errorf("list sessions: %w", err)
+	}
+
+	referenced := make(map[string]bool)
+	repoDirs := make(map[string]bool)
+	for _, sess := range sessions {
+		if sess.Workspace != "" {
+			referenced[sess.Workspace] = true
+		}
+		if sess.Dir != "" {
+			repoDirs[sess.Dir] = true
+		}
+	}
+
+	for _, sess := range sessions {
+		if sess.Workspace == "" {
+			continue
+		}
+		if sess.ExecutorState != "DEAD" && sess.ExecutorState != "DONE" {
+			continue
+		}
+		mgr := workspace.Detect(sess.Dir, s.cfg.Dir)
+		if mgr == nil {
+			continue
+		}
+		clean, err := mgr.IsClean(sess.Dir, sess.Workspace)
+		if err != nil || !clean {
+			res.Retained = append(res.Retained, sess.Workspace)
+			continue
+		}
+		mgr.Remove(sess.Dir, sess.Workspace)
+		s.store.UpdateSessionWorkspace(sess.SessionID, "")
+		delete(referenced, sess.Workspace)
+		res.Pruned = append(res.Pruned, sess.Workspace)
+	}
+
+	// Orphan sweep: for every repo that any session lives in, any VCS workspace
+	// not in `referenced` is a leftover from a session cctl has forgotten about.
+	seen := make(map[string]bool)
+	for dir := range repoDirs {
+		mgr := workspace.Detect(dir, s.cfg.Dir)
+		if mgr == nil {
+			continue
+		}
+		names, err := mgr.ListWorkspaces(dir)
+		if err != nil {
+			continue
+		}
+		for _, name := range names {
+			if referenced[name] || seen[name] {
+				continue
+			}
+			seen[name] = true
+			mgr.Remove(dir, name)
+			res.Orphans = append(res.Orphans, name)
+		}
+	}
+	return res, nil
 }
 
 // ListRepoDirs returns all VCS directories found under registered repo paths.

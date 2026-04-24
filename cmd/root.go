@@ -32,6 +32,7 @@ Commands:
   repos add <path>       Register a directory containing repos
   repos rm <path>        Unregister a directory
   repos [list]           List registered directories
+  workspace prune        Remove workspaces for dead/done sessions with no unlanded work
   serve [--port 4141]    Start web dashboard
   hook                   Handle hook event (stdin)
   bar                    Render tmux status bar

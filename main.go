@@ -120,6 +120,8 @@ func run(cfg *config.Config, subcmd string, args []string) error {
 		return cmd.Bar(svc)
 	case "serve":
 		return cmd.Serve(cfg, svc, args)
+	case "workspace":
+		return cmd.Workspace(svc, args)
 	default:
 		cmd.Help()
 		return fmt.Errorf("unknown command: %s", subcmd)
