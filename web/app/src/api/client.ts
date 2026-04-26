@@ -21,6 +21,7 @@ export function createSession(opts: {
   name: string;
   dir: string;
   safe?: boolean;
+  harness?: string;
   project_id?: string;
 }): Promise<{ status: string; name: string; session_id: string }> {
   return fetchJSON("/api/sessions", {
@@ -79,6 +80,10 @@ export function sendText(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   });
+}
+
+export function getConfig(): Promise<{ default_harness: string }> {
+  return fetchJSON<{ default_harness: string }>("/api/config");
 }
 
 export function getRepos(): Promise<string[]> {

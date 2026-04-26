@@ -17,6 +17,7 @@ export interface Session {
   workspace: string;
   prompt: string;
   safe: boolean;
+  harness: string;
   created_at: number;
   updated_at: number;
   attached: boolean;

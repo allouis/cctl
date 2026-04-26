@@ -11,7 +11,7 @@ import { NewSessionModal } from "./components/shared/NewSessionModal";
 import { RepoSessionModal } from "./components/shared/RepoSessionModal";
 import { SystemPromptModal } from "./components/shared/SystemPromptModal";
 import { ErrorBoundary } from "./components/shared/ErrorBoundary";
-import { deleteSession, getProjects, getRepos } from "./api/client";
+import { deleteSession, getConfig, getProjects, getRepos } from "./api/client";
 
 function parseUrl(): ViewState {
   const path = window.location.pathname;
@@ -38,6 +38,7 @@ function Layout() {
   const [systemPromptOpen, setSystemPromptOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [repos, setRepos] = useState<string[]>([]);
+  const [defaultHarness, setDefaultHarness] = useState("claude");
 
   const refreshProjects = useCallback(() => {
     getProjects().then(setProjects).catch(() => {});
@@ -46,6 +47,7 @@ function Layout() {
   useEffect(() => {
     refreshProjects();
     getRepos().then(setRepos).catch(() => {});
+    getConfig().then((c) => setDefaultHarness(c.default_harness)).catch(() => {});
   }, [refreshProjects]);
 
   const navigate = useCallback((next: ViewState) => {
@@ -156,6 +158,7 @@ function Layout() {
         projects={projects}
         onProjectCreated={refreshProjects}
         repos={repos}
+        defaultHarness={defaultHarness}
       />
 
       <RepoSessionModal
@@ -168,6 +171,7 @@ function Layout() {
         projects={projects}
         onProjectCreated={refreshProjects}
         repos={repos}
+        defaultHarness={defaultHarness}
       />
 
       <SystemPromptModal

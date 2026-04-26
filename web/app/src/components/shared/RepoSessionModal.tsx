@@ -11,6 +11,7 @@ interface RepoSessionModalProps {
   projects: Project[];
   onProjectCreated: () => void;
   repos: string[];
+  defaultHarness: string;
 }
 
 type Step = "pick-repo" | "configure";
@@ -22,12 +23,14 @@ export function RepoSessionModal({
   projects,
   onProjectCreated,
   repos,
+  defaultHarness,
 }: RepoSessionModalProps) {
   const [step, setStep] = useState<Step>("pick-repo");
   const [query, setQuery] = useState("");
   const [selectedRepo, setSelectedRepo] = useState("");
   const [customDir, setCustomDir] = useState("");
   const [name, setName] = useState("");
+  const [harness, setHarness] = useState(defaultHarness);
   const [autoApprove, setAutoApprove] = useState(true);
   const [projectId, setProjectId] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
@@ -49,6 +52,7 @@ export function RepoSessionModal({
       setSelectedRepo("");
       setCustomDir("");
       setName("");
+      setHarness(defaultHarness);
       setAutoApprove(true);
       setProjectId("");
       setNewProjectName("");
@@ -125,7 +129,8 @@ export function RepoSessionModal({
       const result = await createSession({
         name: name.trim(),
         dir,
-        safe: !autoApprove,
+        safe: harness === "claude" ? !autoApprove : false,
+        harness,
         project_id: resolvedProjectId,
       });
       if (selectedRepo) addRecentRepo(selectedRepo);
@@ -297,6 +302,19 @@ export function RepoSessionModal({
               )}
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Harness
+                </label>
+                <select
+                  value={harness}
+                  onChange={(e) => setHarness(e.target.value)}
+                  className="w-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm border border-gray-300 dark:border-gray-700 rounded-md px-3 py-1.5 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="claude">Claude Code</option>
+                  <option value="pi">Pi</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                   Project
                 </label>
                 <select
@@ -321,17 +339,19 @@ export function RepoSessionModal({
                   />
                 )}
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={autoApprove}
-                  onChange={(e) => setAutoApprove(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600 text-indigo-500 focus:ring-indigo-500"
-                />
-                <span className="text-xs text-gray-600 dark:text-gray-400">
-                  Auto-approve tool use
-                </span>
-              </label>
+              {harness === "claude" && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoApprove}
+                    onChange={(e) => setAutoApprove(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-indigo-500 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                    Auto-approve tool use
+                  </span>
+                </label>
+              )}
               {error && <div className="text-xs text-red-500">{error}</div>}
             </div>
             <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
