@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -158,6 +159,8 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 	safe := opts.Safe || s.cfg.Safe
 	harness := opts.Harness
 
+	log.Printf("session/create: name=%q dir=%q harness=%q cmd=%q safe=%v sessionID=%s", name, dir, harness, s.cfg.Cmd, safe, sessionID)
+
 	if err := s.ensureHarness(harness); err != nil {
 		return "", fmt.Errorf("setup harness: %w", err)
 	}
@@ -175,11 +178,14 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 	}
 
 	win := s.buildWindow(sessionID, name, opts.Prompt, "", harness, safe, false, workspaceName != "")
+	log.Printf("session/create: resolved command: %s", win.command)
 
 	windowID, err := s.runner.NewWindow(s.cfg.Session, name, win.command, workDir, win.env)
 	if err != nil {
+		log.Printf("session/create: window creation failed: %v", err)
 		return "", fmt.Errorf("create window: %w", err)
 	}
+	log.Printf("session/create: window created: %s (tmux=%s)", sessionID, windowID)
 
 	// Write DB row immediately — no more gap before first hook.
 	now := time.Now().Unix()
@@ -229,11 +235,12 @@ func (s *Service) buildWindow(sessionID, name, prompt, transcriptPath, harness s
 	}
 
 	cmd := s.cfg.Cmd
-	if harness == "claude" {
+	if harness == "claude" && !isClaudeCmd(s.cfg.Cmd) {
 		cmd = "claude"
 	}
 	cmd = resolveCmd(cmd)
-	if !strings.HasSuffix(cmd, "/claude") && cmd != "claude" {
+	if !isClaudeCmd(cmd) {
+		log.Printf("session/buildWindow: cmd %q is not a claude command, returning as-is", cmd)
 		return windowSpec{command: cmd, env: env}
 	}
 
@@ -326,6 +333,8 @@ func (s *Service) Resume(nameOrID string) error {
 		return fmt.Errorf("session '%s' is %s, not resumable", nameOrID, sess.ExecutorState)
 	}
 
+	log.Printf("session/resume: id=%s harness=%q cmd=%q", sess.SessionID, sess.Harness, s.cfg.Cmd)
+
 	// Ensure tmux session exists
 	if !s.runner.HasSession(s.cfg.Session) {
 		if err := s.runner.NewSession(s.cfg.Session, "dash", ""); err != nil {
@@ -343,6 +352,7 @@ func (s *Service) Resume(nameOrID string) error {
 	os.Remove(bridgeSocketPath(sess.SessionID))
 
 	win := s.buildWindow(sess.SessionID, sess.Name, "", sess.TranscriptPath, sess.Harness, sess.Safe, true, sess.Workspace != "")
+	log.Printf("session/resume: resolved command: %s", win.command)
 
 	// Use workspace dir if the session has one, otherwise the original CWD.
 	// If the workspace dir is missing (pruned by Kill or an earlier `workspace prune`),
@@ -364,8 +374,10 @@ func (s *Service) Resume(nameOrID string) error {
 
 	windowID, err := s.runner.NewWindow(s.cfg.Session, sess.Name, win.command, dir, win.env)
 	if err != nil {
+		log.Printf("session/resume: window creation failed: %v", err)
 		return fmt.Errorf("create window: %w", err)
 	}
+	log.Printf("session/resume: window created: %s (tmux=%s)", sess.SessionID, windowID)
 
 	s.store.UpdateWindowID(sess.SessionID, windowID)
 	s.store.UpdateSessionState(sess.SessionID, "STARTING", "resumed")
@@ -525,15 +537,18 @@ func (s *Service) initSessionEnv() {
 // hooks.json for Claude, pi-bridge.ts for pi.
 func (s *Service) ensureHarness(harness string) error {
 	if harness == "pi" || (harness == "" && isPiCmd(s.cfg.Cmd)) {
+		log.Printf("session/harness: writing pi bridge extension (harness=%q cmd=%q)", harness, s.cfg.Cmd)
 		if err := os.MkdirAll(s.cfg.Dir, 0o755); err != nil {
 			return err
 		}
 		_, err := config.WriteBridgeExtension(s.cfg.Dir)
 		return err
 	}
-	if harness == "claude" || (harness == "" && s.cfg.Cmd == "claude") {
+	if harness == "claude" || (harness == "" && isClaudeCmd(s.cfg.Cmd)) {
+		log.Printf("session/harness: writing hooks.json (harness=%q cmd=%q)", harness, s.cfg.Cmd)
 		return s.ensureHooksJSON()
 	}
+	log.Printf("session/harness: no harness matched (harness=%q cmd=%q) — skipping hooks.json", harness, s.cfg.Cmd)
 	return nil
 }
 
@@ -764,6 +779,10 @@ func resolveCmd(cmd string) string {
 
 func isPiCmd(cmd string) bool {
 	return cmd == "pi" || strings.HasSuffix(cmd, "/pi")
+}
+
+func isClaudeCmd(cmd string) bool {
+	return cmd == "claude" || strings.HasSuffix(cmd, "/claude")
 }
 
 func shellQuote(s string) string {
