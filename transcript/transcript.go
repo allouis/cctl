@@ -78,6 +78,10 @@ func Parse(path string, limit int) ([]Entry, error) {
 		entries = entries[len(entries)-limit:]
 	}
 
+	if entries == nil {
+		entries = []Entry{}
+	}
+
 	return entries, nil
 }
 

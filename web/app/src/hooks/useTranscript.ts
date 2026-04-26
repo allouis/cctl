@@ -24,7 +24,7 @@ export function useTranscript(sessionId: string | null, updateKey: number) {
     getTranscript(sessionId)
       .then((data) => {
         if (!cancelled) {
-          setEntries(data);
+          setEntries(data ?? []);
           setLoading(false);
         }
       })

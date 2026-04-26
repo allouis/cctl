@@ -306,7 +306,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func isPiCmd(cmd string) bool {
-	return cmd == "pi" || len(cmd) > 3 && cmd[len(cmd)-3:] == "/pi"
+	return cmd == "pi" || strings.HasSuffix(cmd, "/pi")
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
