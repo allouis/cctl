@@ -44,6 +44,7 @@ func New(svc *session.Service, cfg *config.Config, notify <-chan struct{}) *Serv
 	s.mux.HandleFunc("/api/projects/", s.handleProject)
 	s.mux.HandleFunc("/api/repos", s.handleRepos)
 	s.mux.HandleFunc("/api/system-prompt", s.handleSystemPrompt)
+	s.mux.HandleFunc("/api/config", s.handleConfig)
 	s.mux.HandleFunc("/api/events", s.handleEvents)
 
 	return s
@@ -70,6 +71,7 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 			Dir       string  `json:"dir"`
 			Prompt    string  `json:"prompt"`
 			Safe      bool    `json:"safe"`
+			Harness   string  `json:"harness"`
 			ParentID  *string `json:"parent_id"`
 			ProjectID *string `json:"project_id"`
 		}
@@ -90,6 +92,7 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 			Dir:       dir,
 			Prompt:    req.Prompt,
 			Safe:      req.Safe,
+			Harness:   req.Harness,
 			ParentID:  req.ParentID,
 			ProjectID: req.ProjectID,
 		})
@@ -288,6 +291,22 @@ func (s *Server) handleSystemPrompt(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	harness := "claude"
+	if isPiCmd(s.cfg.Cmd) {
+		harness = "pi"
+	}
+	writeJSON(w, map[string]string{"default_harness": harness})
+}
+
+func isPiCmd(cmd string) bool {
+	return cmd == "pi" || len(cmd) > 3 && cmd[len(cmd)-3:] == "/pi"
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {

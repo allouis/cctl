@@ -1,6 +1,7 @@
 package session
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -436,6 +437,118 @@ func TestTranscriptEmptyPath(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Errorf("got %d entries, want 0", len(entries))
+	}
+}
+
+func TestIsPiCmd(t *testing.T) {
+	tests := []struct {
+		cmd  string
+		want bool
+	}{
+		{"pi", true},
+		{"/usr/local/bin/pi", true},
+		{"claude", false},
+		{"bash", false},
+		{"pi-agent", false},
+	}
+	for _, tt := range tests {
+		if got := isPiCmd(tt.cmd); got != tt.want {
+			t.Errorf("isPiCmd(%q) = %v, want %v", tt.cmd, got, tt.want)
+		}
+	}
+}
+
+func TestBuildWindowPi(t *testing.T) {
+	svc, _, _ := setupTest(t)
+	svc.cfg.Cmd = "pi"
+
+	// Write the bridge file so the path exists
+	config.WriteBridgeExtension(svc.cfg.Dir)
+
+	win := svc.buildWindow("test-uuid", "myproject", "fix bugs", "", "", false, false, false)
+
+	if strings.Contains(win.command, "--session-id") {
+		t.Errorf("new session should not use --session-id: %q", win.command)
+	}
+	if !strings.Contains(win.command, "-e ") {
+		t.Errorf("command missing -e flag: %q", win.command)
+	}
+	if !strings.Contains(win.command, "pi-bridge.ts") {
+		t.Errorf("command missing bridge path: %q", win.command)
+	}
+	if !strings.Contains(win.command, "-p") {
+		t.Errorf("command missing prompt flag: %q", win.command)
+	}
+
+	hasSessionID := false
+	hasBin := false
+	for _, e := range win.env {
+		if strings.HasPrefix(e, "CCTL_SESSION_ID=test-uuid") {
+			hasSessionID = true
+		}
+		if strings.HasPrefix(e, "CCTL_BIN=") {
+			hasBin = true
+		}
+	}
+	if !hasSessionID {
+		t.Error("env missing CCTL_SESSION_ID")
+	}
+	if !hasBin {
+		t.Error("env missing CCTL_BIN")
+	}
+}
+
+func TestBuildWindowPiResume(t *testing.T) {
+	svc, _, _ := setupTest(t)
+	svc.cfg.Cmd = "pi"
+	config.WriteBridgeExtension(svc.cfg.Dir)
+
+	win := svc.buildWindow("test-uuid", "myproject", "", "/path/to/session.jsonl", "", false, true, false)
+
+	if !strings.Contains(win.command, "--session /path/to/session.jsonl") {
+		t.Errorf("resume command missing --session: %q", win.command)
+	}
+	if strings.Contains(win.command, "--session-id") {
+		t.Errorf("resume command should not have --session-id: %q", win.command)
+	}
+}
+
+func TestBuildWindowPiResumeNoTranscript(t *testing.T) {
+	svc, _, _ := setupTest(t)
+	svc.cfg.Cmd = "pi"
+	config.WriteBridgeExtension(svc.cfg.Dir)
+
+	win := svc.buildWindow("test-uuid", "myproject", "", "", "", false, true, false)
+
+	if !strings.Contains(win.command, "-e ") {
+		t.Errorf("resume without transcript should still have -e flag: %q", win.command)
+	}
+	if strings.Contains(win.command, "--session") {
+		t.Errorf("resume without transcript should not have --session: %q", win.command)
+	}
+}
+
+func TestBridgeSocketPath(t *testing.T) {
+	path := bridgeSocketPath("abc-123")
+	if !strings.Contains(path, "cctl-abc-123.sock") {
+		t.Errorf("unexpected socket path: %q", path)
+	}
+}
+
+func TestCreatePiSession(t *testing.T) {
+	svc, store, _ := setupTest(t)
+	svc.cfg.Cmd = "pi"
+
+	if _, err := svc.Create(CreateOpts{Name: "pitest", Dir: "/tmp"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	s, _ := store.GetSession("pitest")
+	if s == nil {
+		t.Fatal("session not found")
+	}
+	if s.ExecutorState != "STARTING" {
+		t.Errorf("state = %q, want STARTING", s.ExecutorState)
 	}
 }
 

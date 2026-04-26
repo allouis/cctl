@@ -52,6 +52,7 @@ type Session struct {
 	Workspace      string `json:"workspace"`
 	Prompt         string `json:"prompt"`
 	Safe           bool   `json:"safe"`
+	Harness        string `json:"harness"`
 	CreatedAt      int64  `json:"created_at"`
 	UpdatedAt      int64  `json:"updated_at"`
 	Attached       bool   `json:"attached"`
@@ -100,6 +101,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     workspace       TEXT NOT NULL DEFAULT '',
     prompt          TEXT NOT NULL DEFAULT '',
     safe            INTEGER NOT NULL DEFAULT 0,
+    harness         TEXT NOT NULL DEFAULT '',
     created_at      INTEGER NOT NULL DEFAULT 0,
     updated_at      INTEGER NOT NULL
 );
@@ -146,6 +148,10 @@ CREATE TABLE IF NOT EXISTS repos (
 );
 `
 
+const migration8 = `
+ALTER TABLE sessions ADD COLUMN harness TEXT NOT NULL DEFAULT '';
+`
+
 func Open(dbPath string) (*DB, error) {
 	if dbPath != ":memory:" {
 		if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
@@ -190,6 +196,7 @@ func Open(dbPath string) (*DB, error) {
 	conn.Exec(migration5)
 	conn.Exec(migration6)
 	conn.Exec(migration7)
+	conn.Exec(migration8)
 	// Backfill: DONE executor sessions → done work_state.
 	conn.Exec(`UPDATE sessions SET work_state = 'done' WHERE executor_state = 'DONE' AND work_state = 'running'`)
 
@@ -225,8 +232,8 @@ func (d *DB) InsertEvent(e Event) error {
 	// Session-level fields (window_id, workspace, prompt, safe, created_at)
 	// are preserved on update — they're set by Create, not by hook events.
 	_, err = tx.Exec(`
-		INSERT INTO sessions (session_id, name, parent_id, project_id, work_state, executor_state, executor_detail, tool, preview, dir, cwd, last_event, transcript_path, conversation_id, window_id, workspace, prompt, safe, created_at, updated_at)
-		VALUES (?, ?, NULL, NULL, 'running', ?, ?, ?, ?, '', ?, ?, ?, '', '', '', '', 0, 0, ?)
+		INSERT INTO sessions (session_id, name, parent_id, project_id, work_state, executor_state, executor_detail, tool, preview, dir, cwd, last_event, transcript_path, conversation_id, window_id, workspace, prompt, safe, harness, created_at, updated_at)
+		VALUES (?, ?, NULL, NULL, 'running', ?, ?, ?, ?, '', ?, ?, ?, '', '', '', '', 0, '', 0, ?)
 		ON CONFLICT(session_id) DO UPDATE SET
 			name = excluded.name,
 			executor_state = CASE
@@ -262,14 +269,14 @@ func (d *DB) InsertEvent(e Event) error {
 }
 
 const sessionCols = `session_id, name, parent_id, project_id, work_state, executor_state, executor_detail, tool, preview, dir, cwd, last_event,
-	transcript_path, conversation_id, window_id, workspace, prompt, safe, created_at, updated_at`
+	transcript_path, conversation_id, window_id, workspace, prompt, safe, harness, created_at, updated_at`
 
 func scanSession(scanner interface{ Scan(...any) error }) (*Session, error) {
 	var s Session
 	err := scanner.Scan(
 		&s.SessionID, &s.Name, &s.ParentID, &s.ProjectID, &s.WorkState, &s.ExecutorState, &s.ExecutorDetail, &s.Tool, &s.Preview,
 		&s.Dir, &s.CWD, &s.LastEvent, &s.TranscriptPath, &s.ConversationID,
-		&s.WindowID, &s.Workspace, &s.Prompt, &s.Safe, &s.CreatedAt, &s.UpdatedAt,
+		&s.WindowID, &s.Workspace, &s.Prompt, &s.Safe, &s.Harness, &s.CreatedAt, &s.UpdatedAt,
 	)
 	return &s, err
 }
@@ -347,10 +354,10 @@ func (d *DB) CreateSession(s Session) error {
 	}
 	_, err := d.conn.Exec(`
 		INSERT INTO sessions (`+sessionCols+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.SessionID, s.Name, s.ParentID, s.ProjectID, s.WorkState, s.ExecutorState, s.ExecutorDetail, s.Tool, s.Preview,
 		s.Dir, s.CWD, s.LastEvent, s.TranscriptPath, s.ConversationID,
-		s.WindowID, s.Workspace, s.Prompt, s.Safe, s.CreatedAt, s.UpdatedAt,
+		s.WindowID, s.Workspace, s.Prompt, s.Safe, s.Harness, s.CreatedAt, s.UpdatedAt,
 	)
 	return err
 }

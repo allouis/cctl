@@ -1,7 +1,10 @@
 package session
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -111,6 +114,7 @@ type CreateOpts struct {
 	Dir       string
 	Prompt    string
 	Safe      bool
+	Harness   string
 	ParentID  *string
 	ProjectID *string
 }
@@ -146,15 +150,16 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 		if err := s.runner.NewSession(s.cfg.Session, "dash", ""); err != nil {
 			return "", fmt.Errorf("create tmux session: %w", err)
 		}
-		s.initSessionEnv()
 	}
+	s.initSessionEnv()
 
 	// Generate session ID and build command
 	sessionID := uuid.New().String()
 	safe := opts.Safe || s.cfg.Safe
+	harness := opts.Harness
 
-	if err := s.ensureHooksJSON(); err != nil {
-		return "", fmt.Errorf("generate hooks.json: %w", err)
+	if err := s.ensureHarness(harness); err != nil {
+		return "", fmt.Errorf("setup harness: %w", err)
 	}
 
 	// Create a VCS workspace if the directory is in a supported repo.
@@ -169,7 +174,7 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 		workDir = wd
 	}
 
-	win := s.buildWindow(sessionID, name, opts.Prompt, safe, false, workspaceName != "")
+	win := s.buildWindow(sessionID, name, opts.Prompt, "", harness, safe, false, workspaceName != "")
 
 	windowID, err := s.runner.NewWindow(s.cfg.Session, name, win.command, workDir, win.env)
 	if err != nil {
@@ -191,6 +196,7 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 		Workspace:    workspaceName,
 		Prompt:       opts.Prompt,
 		Safe:         safe,
+		Harness:      harness,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}); err != nil {
@@ -206,14 +212,29 @@ type windowSpec struct {
 	env     []string // KEY=VALUE pairs passed via tmux new-window -e
 }
 
-func (s *Service) buildWindow(sessionID, name, prompt string, safe, resume, isWorkspace bool) windowSpec {
+func (s *Service) buildWindow(sessionID, name, prompt, transcriptPath, harness string, safe, resume, isWorkspace bool) windowSpec {
 	env := []string{
 		"CCTL_NAME=" + name,
 		"AGENT_BROWSER_SESSION=" + sessionID,
 	}
 
-	if s.cfg.Cmd != "claude" {
-		return windowSpec{command: s.cfg.Cmd, env: env}
+	usePi := harness == "pi" || (harness == "" && isPiCmd(s.cfg.Cmd))
+	if usePi {
+		piCmd := "pi"
+		if harness == "" && isPiCmd(s.cfg.Cmd) {
+			piCmd = s.cfg.Cmd
+		}
+		piCmd = resolveCmd(piCmd)
+		return s.buildPiWindow(sessionID, prompt, piCmd, resume, transcriptPath, env)
+	}
+
+	cmd := s.cfg.Cmd
+	if harness == "claude" {
+		cmd = "claude"
+	}
+	cmd = resolveCmd(cmd)
+	if !strings.HasSuffix(cmd, "/claude") && cmd != "claude" {
+		return windowSpec{command: cmd, env: env}
 	}
 
 	hooksPath := filepath.Join(s.cfg.Dir, "hooks.json")
@@ -234,16 +255,14 @@ func (s *Service) buildWindow(sessionID, name, prompt string, safe, resume, isWo
 	if prompt != "" {
 		flags += fmt.Sprintf(" -p %s", shellQuote(prompt))
 	}
-	cmd := "claude " + flags
+	cmd = cmd + " " + flags
 
-	// Claude shows a workspace trust prompt for untrusted directories.
-	// Auto-approve by sending Enter from a background process when
-	// running without --safe (permissions are already skipped, so the
-	// user trusts the directory). Harmless if no prompt appears — Enter
-	// at the idle prompt is ignored.
-	// Wrapped in bash -c because tmux may use fish as default shell.
+	// Auto-dismiss startup prompts (bypass-permissions confirmation,
+	// workspace trust) by sending keystrokes from a background process.
+	// Down selects "Yes, I accept" on the bypass prompt, first Enter
+	// confirms it, second Enter dismisses any workspace trust prompt.
 	if !safe && !resume {
-		cmd = fmt.Sprintf("bash -c 'sleep 3 && tmux send-keys -t \"$TMUX_PANE\" Enter &'; %s", cmd)
+		cmd = fmt.Sprintf("bash -c 'sleep 3 && tmux send-keys -t \"$TMUX_PANE\" Down && sleep 0.5 && tmux send-keys -t \"$TMUX_PANE\" Enter && sleep 2 && tmux send-keys -t \"$TMUX_PANE\" Enter &'; %s", cmd)
 	}
 
 	return windowSpec{command: cmd, env: env}
@@ -266,6 +285,7 @@ func (s *Service) Kill(nameOrID string) error {
 		s.runner.KillWindow(s.cfg.Session, sess.WindowID)
 	}
 
+	os.Remove(bridgeSocketPath(sess.SessionID))
 	s.pruneWorkspaceIfClean(sess)
 
 	s.store.UpdateSessionState(sess.SessionID, "DEAD", "killed")
@@ -311,18 +331,18 @@ func (s *Service) Resume(nameOrID string) error {
 		if err := s.runner.NewSession(s.cfg.Session, "dash", ""); err != nil {
 			return fmt.Errorf("create tmux session: %w", err)
 		}
-		s.initSessionEnv()
+	}
+	s.initSessionEnv()
+
+	if err := s.ensureHarness(sess.Harness); err != nil {
+		return fmt.Errorf("setup harness: %w", err)
 	}
 
-	if err := s.ensureHooksJSON(); err != nil {
-		return fmt.Errorf("generate hooks.json: %w", err)
-	}
-
-	// Kill any orphaned claude process still holding this session ID.
-	// This can happen when a tmux window dies but the process survives.
+	// Kill any orphaned process still holding this session ID.
 	killOrphanedProcess(sess.SessionID)
+	os.Remove(bridgeSocketPath(sess.SessionID))
 
-	win := s.buildWindow(sess.SessionID, sess.Name, "", sess.Safe, true, sess.Workspace != "")
+	win := s.buildWindow(sess.SessionID, sess.Name, "", sess.TranscriptPath, sess.Harness, sess.Safe, true, sess.Workspace != "")
 
 	// Use workspace dir if the session has one, otherwise the original CWD.
 	// If the workspace dir is missing (pruned by Kill or an earlier `workspace prune`),
@@ -386,14 +406,26 @@ type SendResult struct {
 // that has a tmux client attached (human is interacting directly).
 var ErrSessionAttached = fmt.Errorf("session has an attached tmux client")
 
-// Send sends text to a session's tmux window and verifies delivery
-// by polling the transcript for the user message.
+// Send sends text to a session. Uses the bridge socket for pi sessions
+// (direct API injection) or tmux send-keys for Claude sessions.
 func (s *Service) Send(nameOrID, text string) (*SendResult, error) {
 	sess, err := s.resolveSession(nameOrID)
 	if err != nil {
 		return nil, err
 	}
-	if sess == nil || sess.WindowID == "" {
+	if sess == nil {
+		return nil, fmt.Errorf("session '%s' not found", nameOrID)
+	}
+
+	// Try bridge socket (pi harness) — no tmux attachment check needed
+	// because messages go through pi's API, not the terminal.
+	sockPath := bridgeSocketPath(sess.SessionID)
+	if _, err := os.Stat(sockPath); err == nil {
+		return s.sendViaBridge(sockPath, text)
+	}
+
+	// Fall back to tmux send-keys (Claude harness)
+	if sess.WindowID == "" {
 		return nil, fmt.Errorf("session '%s' has no active window", nameOrID)
 	}
 	attached := s.runner.ActiveWindowIDs(s.cfg.Session)
@@ -487,6 +519,22 @@ func (s *Service) liveWindowIDs() map[string]bool {
 func (s *Service) initSessionEnv() {
 	s.runner.SetEnv(s.cfg.Session, "PATH", os.Getenv("PATH"))
 	s.runner.UnsetEnv(s.cfg.Session, "CLAUDECODE")
+}
+
+// ensureHarness writes the configuration file for the active harness:
+// hooks.json for Claude, pi-bridge.ts for pi.
+func (s *Service) ensureHarness(harness string) error {
+	if harness == "pi" || (harness == "" && isPiCmd(s.cfg.Cmd)) {
+		if err := os.MkdirAll(s.cfg.Dir, 0o755); err != nil {
+			return err
+		}
+		_, err := config.WriteBridgeExtension(s.cfg.Dir)
+		return err
+	}
+	if harness == "claude" || (harness == "" && s.cfg.Cmd == "claude") {
+		return s.ensureHooksJSON()
+	}
+	return nil
 }
 
 func (s *Service) ensureHooksJSON() error {
@@ -634,6 +682,88 @@ func killOrphanedProcess(sessionID string) {
 	exec.Command("pkill", "-f", "--session-id "+sessionID).Run()
 	// Brief pause to let the process release its lock.
 	time.Sleep(100 * time.Millisecond)
+}
+
+func (s *Service) buildPiWindow(sessionID, prompt, piCmd string, resume bool, transcriptPath string, env []string) windowSpec {
+	bridgePath := filepath.Join(s.cfg.Dir, "pi-bridge.ts")
+
+	env = append(env,
+		"CCTL_SESSION_ID="+sessionID,
+		"CCTL_BIN="+ResolveBinaryPath(),
+	)
+
+	var flags string
+	if resume && transcriptPath != "" {
+		flags = fmt.Sprintf("--session %s -e %s", shellQuote(transcriptPath), shellQuote(bridgePath))
+	} else {
+		flags = fmt.Sprintf("-e %s", shellQuote(bridgePath))
+	}
+	if prompt != "" {
+		flags += fmt.Sprintf(" -p %s", shellQuote(prompt))
+	}
+
+	return windowSpec{command: piCmd + " " + flags, env: env}
+}
+
+// sendViaBridge delivers a prompt to a pi session via its Unix socket.
+func (s *Service) sendViaBridge(sockPath, text string) (*SendResult, error) {
+	conn, err := net.DialTimeout("unix", sockPath, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("connect to bridge: %w", err)
+	}
+	defer conn.Close()
+
+	cmd := struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}{Type: "prompt", Text: text}
+	data, _ := json.Marshal(cmd)
+	data = append(data, '\n')
+
+	conn.SetDeadline(time.Now().Add(5 * time.Second))
+	if _, err := conn.Write(data); err != nil {
+		return nil, fmt.Errorf("write to bridge: %w", err)
+	}
+
+	reader := bufio.NewReader(conn)
+	line, err := reader.ReadBytes('\n')
+	if err != nil {
+		return nil, fmt.Errorf("read bridge response: %w", err)
+	}
+
+	var resp struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(line, &resp); err != nil {
+		return nil, fmt.Errorf("parse bridge response: %w", err)
+	}
+
+	if resp.Error != "" {
+		return nil, fmt.Errorf("bridge: %s", resp.Error)
+	}
+
+	return &SendResult{Confirmed: resp.OK}, nil
+}
+
+func bridgeSocketPath(sessionID string) string {
+	return filepath.Join(os.TempDir(), "cctl-"+sessionID+".sock")
+}
+
+// resolveCmd returns the absolute path for a command name.
+// Falls back to the original name if lookup fails.
+func resolveCmd(cmd string) string {
+	if filepath.IsAbs(cmd) {
+		return cmd
+	}
+	if abs, err := exec.LookPath(cmd); err == nil {
+		return abs
+	}
+	return cmd
+}
+
+func isPiCmd(cmd string) bool {
+	return cmd == "pi" || strings.HasSuffix(cmd, "/pi")
 }
 
 func shellQuote(s string) string {
