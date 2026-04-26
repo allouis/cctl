@@ -63,14 +63,23 @@
             defaultText = lib.literalExpression "pkgs.claude-code";
             description = "Claude Code package to make available to cctl sessions.";
           };
+          piPackage = lib.mkOption {
+            type = lib.types.nullOr lib.types.package;
+            default = null;
+            description = "Pi coding agent package to make available to cctl sessions.";
+          };
         };
         config = lib.mkIf config.services.cctl.enable (let
           cfg = config.services.cctl;
           cctlBin = self.packages.${pkgs.system}.default;
+          extraPath = lib.concatStringsSep ":" (
+            [ "${cfg.claudePackage}/bin" ]
+            ++ lib.optional (cfg.piPackage != null) "${cfg.piPackage}/bin"
+          );
           wrapper = pkgs.writeShellScript "cctl-serve" ''
             exec ${pkgs.runtimeShell} -l -c '
               export TMUX_TMPDIR="''${XDG_RUNTIME_DIR:-/tmp}"
-              export PATH="${cfg.claudePackage}/bin:$PATH"
+              export PATH="${extraPath}:$PATH"
               exec ${cctlBin}/bin/cctl serve --port ${toString cfg.port}
             '
           '';
