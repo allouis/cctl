@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -22,6 +24,41 @@ func TestDefaults(t *testing.T) {
 	}
 	if cfg.Safe != false {
 		t.Errorf("Safe = %v, want false", cfg.Safe)
+	}
+}
+
+func TestLoadSettings(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{Dir: dir}
+
+	// No file → no error, no env
+	LoadSettings(cfg)
+	if cfg.SessionEnv != nil {
+		t.Errorf("expected nil SessionEnv with no file, got %v", cfg.SessionEnv)
+	}
+
+	// Valid file
+	data := `{"sessionEnv": {"RAM_STORE": "{{dir}}/.ram/tasks.jsonl", "DEBUG": "1"}}`
+	os.WriteFile(filepath.Join(dir, "settings.json"), []byte(data), 0644)
+	LoadSettings(cfg)
+	if len(cfg.SessionEnv) != 2 {
+		t.Fatalf("expected 2 env vars, got %d", len(cfg.SessionEnv))
+	}
+	if cfg.SessionEnv["RAM_STORE"] != "{{dir}}/.ram/tasks.jsonl" {
+		t.Errorf("RAM_STORE = %q", cfg.SessionEnv["RAM_STORE"])
+	}
+	if cfg.SessionEnv["DEBUG"] != "1" {
+		t.Errorf("DEBUG = %q", cfg.SessionEnv["DEBUG"])
+	}
+}
+
+func TestLoadSettingsInvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{Dir: dir}
+	os.WriteFile(filepath.Join(dir, "settings.json"), []byte("{bad json"), 0644)
+	LoadSettings(cfg)
+	if cfg.SessionEnv != nil {
+		t.Errorf("invalid JSON should not set SessionEnv, got %v", cfg.SessionEnv)
 	}
 }
 

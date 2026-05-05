@@ -465,7 +465,7 @@ func TestBuildWindowPi(t *testing.T) {
 	// Write the bridge file so the path exists
 	config.WriteBridgeExtension(svc.cfg.Dir)
 
-	win := svc.buildWindow("test-uuid", "myproject", "fix bugs", "", "", false, false, false)
+	win := svc.buildWindow("test-uuid", "myproject", "fix bugs", "", "", false, false, false, "/tmp/repo")
 
 	if strings.Contains(win.command, "--session-id") {
 		t.Errorf("new session should not use --session-id: %q", win.command)
@@ -498,12 +498,65 @@ func TestBuildWindowPi(t *testing.T) {
 	}
 }
 
+func TestBuildWindowSessionEnv(t *testing.T) {
+	svc, _, _ := setupTest(t)
+	svc.cfg.SessionEnv = map[string]string{
+		"RAM_STORE":    "{{dir}}/.ram/tasks.jsonl",
+		"PROJECT_ROOT": "{{dir}}",
+		"SESSION_LOG":  "/tmp/logs/{{uuid}}.log",
+		"LABEL":        "{{name}}",
+		"STATIC":       "hello",
+	}
+
+	win := svc.buildWindow("abc-123", "my-session", "", "", "claude", false, false, false, "/home/user/repo")
+
+	want := map[string]string{
+		"RAM_STORE":    "/home/user/repo/.ram/tasks.jsonl",
+		"PROJECT_ROOT": "/home/user/repo",
+		"SESSION_LOG":  "/tmp/logs/abc-123.log",
+		"LABEL":        "my-session",
+		"STATIC":       "hello",
+	}
+
+	for wantKey, wantVal := range want {
+		found := false
+		for _, e := range win.env {
+			if e == wantKey+"="+wantVal {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("env missing %s=%s, got %v", wantKey, wantVal, win.env)
+		}
+	}
+}
+
+func TestExpandSessionEnv(t *testing.T) {
+	tests := []struct {
+		tmpl string
+		want string
+	}{
+		{"{{dir}}/.ram/tasks.jsonl", "/repo/.ram/tasks.jsonl"},
+		{"{{uuid}}", "sess-id"},
+		{"{{name}}", "my-task"},
+		{"no-templates", "no-templates"},
+		{"{{dir}}/{{name}}/{{uuid}}", "/repo/my-task/sess-id"},
+	}
+	for _, tt := range tests {
+		got := expandSessionEnv(tt.tmpl, "/repo", "sess-id", "my-task")
+		if got != tt.want {
+			t.Errorf("expandSessionEnv(%q) = %q, want %q", tt.tmpl, got, tt.want)
+		}
+	}
+}
+
 func TestBuildWindowPiResume(t *testing.T) {
 	svc, _, _ := setupTest(t)
 	svc.cfg.Cmd = "pi"
 	config.WriteBridgeExtension(svc.cfg.Dir)
 
-	win := svc.buildWindow("test-uuid", "myproject", "", "/path/to/session.jsonl", "", false, true, false)
+	win := svc.buildWindow("test-uuid", "myproject", "", "/path/to/session.jsonl", "", false, true, false, "/tmp/repo")
 
 	if !strings.Contains(win.command, "--session /path/to/session.jsonl") {
 		t.Errorf("resume command missing --session: %q", win.command)
@@ -518,7 +571,7 @@ func TestBuildWindowPiResumeNoTranscript(t *testing.T) {
 	svc.cfg.Cmd = "pi"
 	config.WriteBridgeExtension(svc.cfg.Dir)
 
-	win := svc.buildWindow("test-uuid", "myproject", "", "", "", false, true, false)
+	win := svc.buildWindow("test-uuid", "myproject", "", "", "", false, true, false, "/tmp/repo")
 
 	if !strings.Contains(win.command, "-e ") {
 		t.Errorf("resume without transcript should still have -e flag: %q", win.command)

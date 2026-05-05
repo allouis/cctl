@@ -177,7 +177,7 @@ func (s *Service) Create(opts CreateOpts) (string, error) {
 		workDir = wd
 	}
 
-	win := s.buildWindow(sessionID, name, opts.Prompt, "", harness, safe, false, workspaceName != "")
+	win := s.buildWindow(sessionID, name, opts.Prompt, "", harness, safe, false, workspaceName != "", dir)
 	log.Printf("session/create: resolved command: %s", win.command)
 
 	windowID, err := s.runner.NewWindow(s.cfg.Session, name, win.command, workDir, win.env)
@@ -218,10 +218,13 @@ type windowSpec struct {
 	env     []string // KEY=VALUE pairs passed via tmux new-window -e
 }
 
-func (s *Service) buildWindow(sessionID, name, prompt, transcriptPath, harness string, safe, resume, isWorkspace bool) windowSpec {
+func (s *Service) buildWindow(sessionID, name, prompt, transcriptPath, harness string, safe, resume, isWorkspace bool, dir string) windowSpec {
 	env := []string{
 		"CCTL_NAME=" + name,
 		"AGENT_BROWSER_SESSION=" + sessionID,
+	}
+	for k, v := range s.cfg.SessionEnv {
+		env = append(env, k+"="+expandSessionEnv(v, dir, sessionID, name))
 	}
 
 	usePi := harness == "pi" || (harness == "" && isPiCmd(s.cfg.Cmd))
@@ -273,6 +276,11 @@ func (s *Service) buildWindow(sessionID, name, prompt, transcriptPath, harness s
 	}
 
 	return windowSpec{command: cmd, env: env}
+}
+
+func expandSessionEnv(tmpl, dir, uuid, name string) string {
+	r := strings.NewReplacer("{{dir}}", dir, "{{uuid}}", uuid, "{{name}}", name)
+	return r.Replace(tmpl)
 }
 
 // Kill terminates a session's tmux window and marks it DEAD.
@@ -351,7 +359,7 @@ func (s *Service) Resume(nameOrID string) error {
 	killOrphanedProcess(sess.SessionID)
 	os.Remove(bridgeSocketPath(sess.SessionID))
 
-	win := s.buildWindow(sess.SessionID, sess.Name, "", sess.TranscriptPath, sess.Harness, sess.Safe, true, sess.Workspace != "")
+	win := s.buildWindow(sess.SessionID, sess.Name, "", sess.TranscriptPath, sess.Harness, sess.Safe, true, sess.Workspace != "", sess.Dir)
 	log.Printf("session/resume: resolved command: %s", win.command)
 
 	// Use workspace dir if the session has one, otherwise the original CWD.

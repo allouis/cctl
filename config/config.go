@@ -6,24 +6,27 @@ import (
 )
 
 type Config struct {
-	Session string // tmux session name
-	Cmd     string // command to run in windows
-	DBPath  string // path to SQLite database
-	Dir     string // config directory
-	Port    int    // web server port
-	Safe    bool   // when true, omit --dangerously-skip-permissions
+	Session    string            // tmux session name
+	Cmd        string            // command to run in windows
+	DBPath     string            // path to SQLite database
+	Dir        string            // config directory
+	Port       int               // web server port
+	Safe       bool              // when true, omit --dangerously-skip-permissions
+	SessionEnv map[string]string // env vars set on each session window, supports {{dir}}/{{uuid}}/{{name}}
 }
 
-// Defaults returns a Config with default values.
+// Defaults returns a Config with default values, then applies settings.json.
 func Defaults() *Config {
 	dir := DefaultDir()
-	return &Config{
+	cfg := &Config{
 		Session: "cc",
 		Cmd:     "claude",
 		DBPath:  filepath.Join(dir, "cctl.db"),
 		Dir:     dir,
 		Port:    4141,
 	}
+	LoadSettings(cfg)
+	return cfg
 }
 
 // DefaultDir returns the cctl config directory (~/.config/cctl).

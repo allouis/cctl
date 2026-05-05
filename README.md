@@ -105,6 +105,36 @@ Sessions survive tmux window crashes and can be resumed. In
 [jj](https://github.com/jj-vcs/jj) repositories, each session gets its own
 workspace so they don't step on each other.
 
+## Configuration
+
+cctl reads optional settings from `~/.config/cctl/settings.json`.
+
+### Session environment variables
+
+Use `sessionEnv` to inject environment variables into every session window.
+Values support template variables that expand at window creation time:
+
+| Template | Expands to |
+|----------|------------|
+| `{{dir}}` | Parent repository directory |
+| `{{uuid}}` | Session UUID |
+| `{{name}}` | Session name |
+
+```json
+{
+  "sessionEnv": {
+    "RAM_STORE": "{{dir}}/.ram/tasks.jsonl",
+    "PROJECT_ROOT": "{{dir}}",
+    "SESSION_LOG": "/tmp/logs/{{uuid}}.log"
+  }
+}
+```
+
+This is useful when sessions run in isolated workspaces (e.g. jj worktrees) and
+you want external tools to share state with the parent repo instead of each
+workspace maintaining its own copy. Values without templates are passed through
+as-is.
+
 ## Development
 
 ```bash

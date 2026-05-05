@@ -105,7 +105,7 @@ server/              HTTP routes + SSE hub with hash-based deduplication
 tmux/                Runner interface + exec wrappers
 transcript/          JSONL transcript parser
 web/                 Embedded React PWA (Vite + React 19 + TypeScript + Tailwind v4)
-config/              Paths, defaults, hooks.json generation
+config/              Paths, defaults, hooks.json generation, settings.json
 ```
 
 ### Frontend architecture
@@ -199,6 +199,12 @@ Sessions are durable — they survive window death. A session in DEAD or DONE ex
 | `--dev` | off | Frontend development mode (serves from disk instead of embedded) |
 
 Internal env var (not user-facing): `CCTL_NAME` — set by Create() in the tmux command string, read by `hook`.
+
+### Settings file
+
+`~/.config/cctl/settings.json` — optional, loaded by `config.LoadSettings()` at startup.
+
+Currently supports `sessionEnv`: a map of env vars injected into every session window via tmux `-e`. Values support `{{dir}}`, `{{uuid}}`, and `{{name}}` template expansion. See README for details.
 
 ## Testing patterns
 
