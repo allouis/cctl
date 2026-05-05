@@ -7,6 +7,9 @@ import (
 )
 
 func Workspace(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl workspace <prune>"); err != nil {
+		return err
+	}
 	if len(args) < 1 {
 		return fmt.Errorf("usage: cctl workspace <prune>")
 	}

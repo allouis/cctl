@@ -10,6 +10,9 @@ import (
 )
 
 func Serve(cfg *config.Config, svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl serve [--port 4141]"); err != nil {
+		return err
+	}
 	port := cfg.Port
 	for i := 0; i < len(args); i++ {
 		switch args[i] {

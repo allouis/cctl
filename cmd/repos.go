@@ -10,6 +10,9 @@ import (
 )
 
 func Repos(store *db.DB, args []string) error {
+	if err := checkHelp(args, "usage: cctl repos <add|rm|list> [path]"); err != nil {
+		return err
+	}
 	if len(args) == 0 {
 		return reposList(store)
 	}

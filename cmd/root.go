@@ -44,6 +44,21 @@ func Help() {
 	fmt.Fprintln(os.Stderr, usage)
 }
 
+type helpError struct{}
+
+func (helpError) Error() string { return "" }
+
+// checkHelp prints usage and returns a helpError if args contain -h or --help.
+func checkHelp(args []string, usage string) error {
+	for _, a := range args {
+		if a == "-h" || a == "--help" {
+			fmt.Fprintln(os.Stderr, usage)
+			return helpError{}
+		}
+	}
+	return nil
+}
+
 func Version() {
 	fmt.Println("cctl", version)
 }

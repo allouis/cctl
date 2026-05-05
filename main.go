@@ -16,6 +16,9 @@ func main() {
 	cfg, subcmd, args := parseArgs(os.Args[1:])
 
 	if err := run(cfg, subcmd, args); err != nil {
+		if err.Error() == "" {
+			return
+		}
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}

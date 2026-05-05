@@ -13,6 +13,10 @@ import (
 )
 
 func New(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl new <name> [dir] [-p prompt] [--safe]"); err != nil {
+		return err
+	}
+
 	var prompt string
 	var safe bool
 	var positional []string
@@ -55,6 +59,9 @@ func New(svc *session.Service, args []string) error {
 }
 
 func Resume(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl resume <name>"); err != nil {
+		return err
+	}
 	if len(args) < 1 {
 		return fmt.Errorf("usage: cctl resume <name>")
 	}
@@ -68,6 +75,9 @@ func Resume(svc *session.Service, args []string) error {
 }
 
 func List(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl ls [-a|--all]"); err != nil {
+		return err
+	}
 	all := false
 	for _, a := range args {
 		if a == "--all" || a == "-a" {
@@ -105,6 +115,9 @@ func List(svc *session.Service, args []string) error {
 }
 
 func Peek(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl peek <name>"); err != nil {
+		return err
+	}
 	if len(args) < 1 {
 		return fmt.Errorf("usage: cctl peek <name>")
 	}
@@ -130,6 +143,9 @@ func Peek(svc *session.Service, args []string) error {
 }
 
 func Log(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl log <name> [n]"); err != nil {
+		return err
+	}
 	if len(args) < 1 {
 		return fmt.Errorf("usage: cctl log <name> [n]")
 	}
@@ -158,6 +174,9 @@ func Log(svc *session.Service, args []string) error {
 }
 
 func Go(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl go <name|number>"); err != nil {
+		return err
+	}
 	if len(args) < 1 {
 		return fmt.Errorf("usage: cctl go <name|number>")
 	}
@@ -168,6 +187,9 @@ func Go(svc *session.Service, args []string) error {
 }
 
 func Send(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl send <name> <text>"); err != nil {
+		return err
+	}
 	if len(args) < 2 {
 		return fmt.Errorf("usage: cctl send <name> <text>")
 	}
@@ -188,6 +210,9 @@ func Send(svc *session.Service, args []string) error {
 }
 
 func Kill(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl kill <name>"); err != nil {
+		return err
+	}
 	if len(args) < 1 {
 		return fmt.Errorf("usage: cctl kill <name>")
 	}
@@ -200,6 +225,9 @@ func Kill(svc *session.Service, args []string) error {
 }
 
 func Delete(svc *session.Service, args []string) error {
+	if err := checkHelp(args, "usage: cctl delete <name>"); err != nil {
+		return err
+	}
 	if len(args) < 1 {
 		return fmt.Errorf("usage: cctl delete <name>")
 	}
@@ -212,6 +240,9 @@ func Delete(svc *session.Service, args []string) error {
 }
 
 func Attach(runner tmux.Runner, session string, args []string) error {
+	if err := checkHelp(args, "usage: cctl attach [name]"); err != nil {
+		return err
+	}
 	if len(args) > 0 {
 		runner.SelectWindow(session, args[0])
 	}
