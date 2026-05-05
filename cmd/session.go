@@ -13,7 +13,15 @@ import (
 )
 
 func New(svc *session.Service, args []string) error {
-	if err := checkHelp(args, "usage: cctl new <name> [dir] [-p prompt] [--harness claude|pi] [--safe]"); err != nil {
+	if err := checkHelp(args, `usage: cctl new <name> [dir] [flags]
+
+Start a new session. Runs in dir (default: current directory).
+In jj repos, each session gets its own workspace.
+
+Flags:
+  -p, --prompt <text>       initial prompt to send
+  --harness <claude|pi>     executor type (default: auto-detect from --cmd)
+  --safe                    omit --dangerously-skip-permissions`); err != nil {
 		return err
 	}
 

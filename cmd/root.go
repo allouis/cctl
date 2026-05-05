@@ -12,33 +12,43 @@ const usage = `cctl — manage Claude Code sessions via tmux
 Usage:
   cctl [flags] <command> [args]
 
-Flags:
+Global flags:
   --session <name>    tmux session name (default: cc)
   --cmd <command>     command to run in windows (default: claude)
   --db <path>         database path (default: ~/.config/cctl/cctl.db)
   --safe              omit --dangerously-skip-permissions from claude
 
-Commands:
-  new <name> [dir] [-p prompt] [--harness claude|pi] [--safe]  Start a new session
-  resume <name>          Resume a dead/done session
-  ls [-a|--all]          List sessions (default: active only)
-  peek <name>            Show preview text
-  log <name> [n]         Show transcript entries
-  go <name|number>       Switch to tmux window
-  send <name> <text>     Send text to session
-  kill <name>            Kill session (keeps history, workspace)
-  delete <name>          Permanently remove session and workspace
-  attach [name]          Attach to tmux session
-  repos add <path>       Register a directory containing repos
-  repos rm <path>        Unregister a directory
-  repos [list]           List registered directories
-  workspace prune        Remove workspaces for dead/done sessions with no unlanded work
-  serve [--port 4141]    Start web dashboard
-  hook                   Handle hook event (stdin)
-  bar                    Render tmux status bar
-  version                Print version
+Session management:
+  new <name> [dir]    Start a new session in dir (default: cwd)
+        -p, --prompt <text>       initial prompt to send
+        --harness <claude|pi>     executor type (default: auto-detect from --cmd)
+        --safe                    omit --dangerously-skip-permissions
+  resume <name>       Resume a dead/done session
+  kill <name>         Kill session (keeps history and workspace)
+  delete <name>       Permanently remove session and workspace
 
-Aliases: ls|list, go|focus, delete|rm, peek|preview, log|transcript, attach|a`
+Session interaction:
+  ls [-a|--all]       List sessions (default: active only)
+  peek <name>         Show session state and preview text
+  log <name> [n]      Show last n transcript entries (default: 20)
+  go <name|number>    Switch to session's tmux window
+  send <name> <text>  Send text to session
+  attach [name]       Attach to tmux session
+
+Repository management:
+  repos add <path>    Register a directory containing repos
+  repos rm <path>     Unregister a directory
+  repos [list]        List registered directories
+
+Maintenance:
+  workspace prune     Remove workspaces for dead/done sessions with no unlanded work
+  serve [--port n]    Start web dashboard (default: 4141)
+  hook                Handle hook event (stdin, internal)
+  bar                 Render tmux status bar (internal)
+  version             Print version
+
+Aliases: ls|list, go|focus, delete|rm, peek|preview, log|transcript, attach|a
+Config:  ~/.config/cctl/settings.json (see README for sessionEnv docs)`
 
 func Help() {
 	fmt.Fprintln(os.Stderr, usage)
