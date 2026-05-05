@@ -13,11 +13,12 @@ import (
 )
 
 func New(svc *session.Service, args []string) error {
-	if err := checkHelp(args, "usage: cctl new <name> [dir] [-p prompt] [--safe]"); err != nil {
+	if err := checkHelp(args, "usage: cctl new <name> [dir] [-p prompt] [--harness claude|pi] [--safe]"); err != nil {
 		return err
 	}
 
 	var prompt string
+	var harness string
 	var safe bool
 	var positional []string
 
@@ -28,6 +29,11 @@ func New(svc *session.Service, args []string) error {
 				prompt = args[i+1]
 				i++
 			}
+		case "--harness":
+			if i+1 < len(args) {
+				harness = args[i+1]
+				i++
+			}
 		case "--safe":
 			safe = true
 		default:
@@ -36,7 +42,7 @@ func New(svc *session.Service, args []string) error {
 	}
 
 	if len(positional) < 1 {
-		return fmt.Errorf("usage: cctl new <name> [dir] [-p prompt] [--safe]")
+		return fmt.Errorf("usage: cctl new <name> [dir] [-p prompt] [--harness claude|pi] [--safe]")
 	}
 
 	name := positional[0]
@@ -46,10 +52,11 @@ func New(svc *session.Service, args []string) error {
 	}
 
 	if _, err := svc.Create(session.CreateOpts{
-		Name:   name,
-		Dir:    dir,
-		Prompt: prompt,
-		Safe:   safe,
+		Name:    name,
+		Dir:     dir,
+		Prompt:  prompt,
+		Safe:    safe,
+		Harness: harness,
 	}); err != nil {
 		return err
 	}

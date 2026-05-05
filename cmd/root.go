@@ -19,7 +19,7 @@ Flags:
   --safe              omit --dangerously-skip-permissions from claude
 
 Commands:
-  new <name> [dir] [-p prompt] [--safe]  Start a new session
+  new <name> [dir] [-p prompt] [--harness claude|pi] [--safe]  Start a new session
   resume <name>          Resume a dead/done session
   ls [-a|--all]          List sessions (default: active only)
   peek <name>            Show preview text
