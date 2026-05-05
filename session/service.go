@@ -221,7 +221,6 @@ type windowSpec struct {
 func (s *Service) buildWindow(sessionID, name, prompt, transcriptPath, harness string, safe, resume, isWorkspace bool, dir string) windowSpec {
 	env := []string{
 		"CCTL_NAME=" + name,
-		"AGENT_BROWSER_SESSION=" + sessionID,
 	}
 	for k, v := range s.cfg.SessionEnv {
 		env = append(env, k+"="+expandSessionEnv(v, dir, sessionID, name))

@@ -123,6 +123,7 @@ Values support template variables that expand at window creation time:
 ```json
 {
   "sessionEnv": {
+    "AGENT_BROWSER_SESSION": "{{uuid}}",
     "RAM_STORE": "{{dir}}/.ram/tasks.jsonl",
     "PROJECT_ROOT": "{{dir}}",
     "SESSION_LOG": "/tmp/logs/{{uuid}}.log"
